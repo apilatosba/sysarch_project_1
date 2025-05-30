@@ -22,6 +22,8 @@ class LeadingZerosCounter(bitWidth: Int)
   // but we dont have addition. exploit the fact that we have all zeroes in the upper half then the addition is just an or operation
   // except one the lower half is also "10000..." then the result is "10000..." with one more zero
   // and the base is just when n is 1 and the result is just the negation of the input
+  //
+  // actually above thing is wrong now i noticed that the input is not in the form 2^n but is in the form of 2*n
 
   if (bitWidth == 1) {
     io.result := ~io.input
@@ -37,14 +39,15 @@ class LeadingZerosCounter(bitWidth: Int)
     val lowerSubCircuit = Module(new LeadingZerosCounter(halfWidth))
     lowerSubCircuit.io.input := lowerHalf
 
-    when (upperSubCircuit.io.result(resultBitWidth - 2) === 1.U) {
-      when (lowerSubCircuit.io.result(resultBitWidth - 2) === 1.U) {
-        io.result := Cat(1.B, Fill(resultBitWidth - 1, 0.B))
-      } .otherwise {
-        io.result := Cat(0.B, upperSubCircuit.io.result | lowerSubCircuit.io.result)
-      }
+    when (upperSubCircuit.io.result === halfWidth.U) {
+      // when (lowerSubCircuit.io.result(resultBitWidth - 2) === 1.U) {
+      //   io.result := Cat(1.B, Fill(resultBitWidth - 1, 0.B))
+      // } .otherwise {
+      //   io.result := Cat(0.B, upperSubCircuit.io.result | lowerSubCircuit.io.result)
+      // }
+      io.result := upperSubCircuit.io.result +& lowerSubCircuit.io.result
     } .otherwise {
-      io.result := Cat(0.B, upperSubCircuit.io.result)
+      io.result := upperSubCircuit.io.result
     }
   }
 }
