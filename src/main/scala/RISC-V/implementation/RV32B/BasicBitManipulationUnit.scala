@@ -6,6 +6,7 @@ import chisel3.util._
 import RISCV.interfaces.generic.AbstractExecutionUnit
 import RISCV.model._
 import bitmanipulation.AbstractLeadingZerosCounter
+import RISCV.implementation.RV32I.Decoder
 
 class BasicBitManipulationUnit(
     genLeadingZerosCounter: () => AbstractLeadingZerosCounter
@@ -22,8 +23,82 @@ class BasicBitManipulationUnit(
   io_reset <> DontCare
   io_trap <> DontCare
 
-  leadingZerosCounter.io <> DontCare
+  // leadingZerosCounter.io <> DontCare
 
-  ??? // TODO: implement Task 2.4 here
+  // ??? // TODO: implement Task 2.4 here
+
+  val decoder = Module(new Decoder())
+  decoder.io_reset <> io_reset
+  decoder.io_decoder.instr := io.instr
+
+  leadingZerosCounter.io.input := 0.U
+
+  val itype = io.instr_type
+  val a = io_reg.reg_read_data1
+  val b = io_reg.reg_read_data2
+
+  io_reg.reg_write_en   := false.B
+  io_reg.reg_write_data := 0.U
+  io_reg.reg_rd         := decoder.io_decoder.rd
+
+  val revA = Reverse(a)
+  val popA = PopCount(a)
+  val lz = leadingZerosCounter.io.result
+
+  switch(itype) {
+    is(RISCV_TYPE.clz) {
+      leadingZerosCounter.io.input := a
+      io_reg.reg_write_en         := true.B
+      io_reg.reg_write_data       := lz
+    }
+    is(RISCV_TYPE.ctz) {
+      leadingZerosCounter.io.input := revA
+      io_reg.reg_write_en         := true.B
+      io_reg.reg_write_data       := lz
+    }
+    is(RISCV_TYPE.cpop) {
+      io_reg.reg_write_en   := true.B
+      io_reg.reg_write_data := popA
+    }
+    is(RISCV_TYPE.min) {
+      io_reg.reg_write_en   := true.B
+      io_reg.reg_write_data := Mux(a.asSInt < b.asSInt, a, b)
+    }
+    is(RISCV_TYPE.max) {
+      io_reg.reg_write_en   := true.B
+      io_reg.reg_write_data := Mux(a.asSInt > b.asSInt, a, b)
+    }
+    is(RISCV_TYPE.minu) {
+      io_reg.reg_write_en   := true.B
+      io_reg.reg_write_data := Mux(a < b, a, b)
+    }
+    is(RISCV_TYPE.maxu) {
+      io_reg.reg_write_en   := true.B
+      io_reg.reg_write_data := Mux(a > b, a, b)
+    }
+  }
+
+
+  // // Assign the trap interface
+  // io_trap.trap_valid := false.B
+  // io_trap.trap_reason := TRAP_REASON.NONE
+
+
+  // // Assign the program counter interface
+  // when (io_reset.rst_n) {
+  //   io_pc.pc_wdata := io_reset.boot_addr // Reset to boot address
+  // } .otherwise {
+  //   io_pc.pc_wdata := io_pc.pc + 4.U // Increment PC by 4 on each cycle
+  // }
+  // io_pc.pc_we := true.B
+
+
+  // // Assign the data interface
+  // io_data.data_req := false.B
+  // io_data.data_addr := 0.U
+  // io_data.data_be := 0.U
+  // io_data.data_we := false.B
+  // io_data.data_wdata := 0.U
+
 
 }

@@ -45,6 +45,12 @@ class RV32I(
         (io_pc.pc + 4.U)
       )
     }
+    is (NEXT_PC_SELECT.IMM) {
+      io_pc.pc_wdata := io_pc.pc + decoder.io_decoder.imm
+    }
+    is (NEXT_PC_SELECT.ALU_OUT_ALIGNED) {
+      io_pc.pc_wdata := (alu.io_alu.result & ~1.U)
+    }
   }
   io_pc.pc_we := control_unit.io_ctrl.stall === STALL_REASON.NO_STALL
 
@@ -63,6 +69,34 @@ class RV32I(
     }
     is(REG_WRITE_SEL.PC_PLUS_4) {
       io_reg.reg_write_data := io_pc.pc + 4.U
+    }
+    is (REG_WRITE_SEL.MEM_OUT_SIGN_EXTENDED) {
+      val memoryReadRaw = io_data.data_rdata
+      val funct3 = RISCV_FUNCT3(decoder.io_decoder.instr(14, 12))
+
+      when (funct3 === RISCV_FUNCT3.F000) { // lb
+        io_reg.reg_write_data := Fill(24, memoryReadRaw(7)) ## memoryReadRaw(7, 0)
+      } .elsewhen(funct3 === RISCV_FUNCT3.F001) { // lh
+        io_reg.reg_write_data := Fill(16, memoryReadRaw(15)) ## memoryReadRaw(15, 0)
+      } .elsewhen(funct3 === RISCV_FUNCT3.F010) { // lw
+        io_reg.reg_write_data := memoryReadRaw
+      } .otherwise {
+        // unreachable
+      }
+    }
+    is (REG_WRITE_SEL.MEM_OUT_ZERO_EXTENDED) {
+      val memoryReadRaw = io_data.data_rdata
+      val funct3 = RISCV_FUNCT3(decoder.io_decoder.instr(14, 12))
+
+      when (funct3 === RISCV_FUNCT3.F100) { // lbu
+        io_reg.reg_write_data := Fill(24, 0.U) ## memoryReadRaw(7, 0)
+      } .elsewhen(funct3 === RISCV_FUNCT3.F101) { // lhu
+        io_reg.reg_write_data := Fill(16, 0.U) ## memoryReadRaw(15, 0)
+      } .elsewhen(funct3 === RISCV_FUNCT3.F010) { // lw
+        io_reg.reg_write_data := memoryReadRaw
+      } .otherwise {
+        // unreachable
+      }
     }
   }
 

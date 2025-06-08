@@ -87,6 +87,34 @@ class ControlUnit extends AbstractControlUnit {
         io_ctrl.data_we := true.B
         io_ctrl.data_be := Fill(2, RISCV_TYPE.getFunct3(io_ctrl.instr_type).asUInt(1)) ## RISCV_TYPE.getFunct3(io_ctrl.instr_type).asUInt(1,0).orR ## 1.U(1.W)
       }
+      is (RISCV_OP.LOAD) {
+        stalled := STALL_REASON.EXECUTION_UNIT
+        io_ctrl.alu_control := ALU_CONTROL.ADD
+        io_ctrl.alu_op_1_sel := ALU_OP_1_SEL.RS1
+        io_ctrl.alu_op_2_sel := ALU_OP_2_SEL.IMM
+        io_ctrl.reg_we := false.B // write to rd when data is received. not now
+        io_ctrl.data_req := true.B
+        io_ctrl.data_we := false.B
+        // copy paste from store
+        io_ctrl.data_be := Fill(2, RISCV_TYPE.getFunct3(io_ctrl.instr_type).asUInt(1)) ## RISCV_TYPE.getFunct3(io_ctrl.instr_type).asUInt(1,0).orR ## 1.U(1.W)
+      }
+      is (RISCV_OP.JAL) {
+        // i dont use alu. right? or do i use it to calculate pc + 4 to write it to rd?
+        // if thats the case then what is REG_WRITE_SEL.PC_PLUS_4?
+        stalled := STALL_REASON.NO_STALL
+        io_ctrl.reg_we := true.B
+        io_ctrl.reg_write_sel := REG_WRITE_SEL.PC_PLUS_4
+        io_ctrl.next_pc_select := NEXT_PC_SELECT.IMM
+      }
+      is (RISCV_OP.JALR) {
+        stalled := STALL_REASON.NO_STALL
+        io_ctrl.reg_we := true.B
+        io_ctrl.reg_write_sel := REG_WRITE_SEL.PC_PLUS_4
+        io_ctrl.next_pc_select := NEXT_PC_SELECT.ALU_OUT_ALIGNED
+        io_ctrl.alu_control := ALU_CONTROL.ADD
+        io_ctrl.alu_op_1_sel := ALU_OP_1_SEL.RS1
+        io_ctrl.alu_op_2_sel := ALU_OP_2_SEL.IMM
+      }
     }
   }
 }
