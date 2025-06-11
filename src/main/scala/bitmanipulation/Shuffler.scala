@@ -2,6 +2,7 @@ package bitmanipulation
 
 import chisel3._
 import chisel3.util._
+import scala.collection.mutable.ArrayBuffer
 
 abstract class AbstractShuffler(bitWidth: Int) extends Module {
   val io = IO(new Bundle {
@@ -53,23 +54,26 @@ class Shuffler(bitWidth: Int) extends AbstractShuffler(bitWidth) {
 
   def GenerateStageMasks(bitWidth: Int): Seq[(Int, BigInt, BigInt)] = {
     val numStages = log2Ceil(bitWidth) - 1
-    (0 until numStages).map { i =>
-      val N = 1 << i
-      val groupSize = 4 * N
-      var maskL = BigInt(0)
-      var maskR = BigInt(0)
 
-      for (j <- 0 until bitWidth) {
-        val j_in_group = j % groupSize
-        if (j_in_group >= N && j_in_group < 2 * N) {
-          maskR = maskR.setBit(j)
+    val result = new ArrayBuffer[(Int, BigInt, BigInt)]()
+    for (i <- 0 until numStages) {
+        val N = 1 << i
+        val groupSize = 4 * N
+        var maskL = BigInt(0)
+        var maskR = BigInt(0)
+
+        for (j <- 0 until bitWidth) {
+            val j_in_group = j % groupSize
+            if (j_in_group >= N && j_in_group < 2 * N) {
+                maskR = maskR.setBit(j)
+            }
+            if (j_in_group >= 2 * N && j_in_group < 3 * N) {
+                maskL = maskL.setBit(j)
+            }
         }
-        if (j_in_group >= 2 * N && j_in_group < 3 * N) {
-          maskL = maskL.setBit(j)
-        }
-      }
-      (N, maskL, maskR)
+        result += ((N, maskL, maskR))
     }
+    result.toSeq
   }
 
   val stageMasks = GenerateStageMasks(bitWidth)
