@@ -61,8 +61,8 @@ class Decoder extends AbstractDecoder {
     }
     is (RISCV_OP.JAL) { // j type
       io_decoder.rd := RD
-      //                     12 bits                                     10 bits                   1 bit                   8 bits          1 bit
-      io_decoder.imm := Fill(12, io_decoder.instr(20)) ## io_decoder.instr(10, 1) ## io_decoder.instr(11) ## io_decoder.instr(19, 12) ## Fill(1, 0.U)
+      //                     12 bits                                     8 bits                   1 bit                   10 bits          1 bit
+      io_decoder.imm := Fill(12, io_decoder.instr(31)) ## io_decoder.instr(19, 12) ## io_decoder.instr(20) ## io_decoder.instr(30, 21) ## Fill(1, 0.U)
     }
     is (RISCV_OP.JALR) { // i type
       io_decoder.rs1 := RS1
