@@ -67,14 +67,11 @@ class BasicBitManipulationUnit(
 
   io_reg.reg_write_en := control_unit.io_ctrl.reg_we
 
-  // tie off counter input by default
   leadingZerosCounter.io.input := 0.U
 
-  // extract operands and rd
   val a  = io_reg.reg_read_data1
   val b  = io_reg.reg_read_data2
 
-  // prepare helpers
   val revA = Reverse(a)
   val popA = PopCount(a)
   val lz   = leadingZerosCounter.io.result

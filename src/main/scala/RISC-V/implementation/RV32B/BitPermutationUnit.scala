@@ -19,9 +19,9 @@ class BitPermutationUnit(
 
   io.misa := "b01__0000__0_00000_00000_00000_00000_00010".U
 
-  // val generalizedReverser = Module(genGeneralizedReverser())
-  // val shuffler = Module(genShuffler())
-  // val rotater = Module(genRotater())
+  val generalizedReverser = Module(genGeneralizedReverser())
+  val shuffler = Module(genShuffler())
+  val rotater = Module(genRotater())
 
   // io.stall := STALL_REASON.NO_STALL
 
@@ -38,136 +38,133 @@ class BitPermutationUnit(
   // ??? // TODO: implement Task 2.5 here
 
 
+  val decoder = Module(new Decoder)
+  decoder.io_reset <> io_reset
+  decoder.io_decoder.instr := io.instr
 
+  object State extends ChiselEnum {
+    val Normal = Value("b0".U)
+    val Rotating = Value("b1".U)
+  }
+  val state = RegInit(State.Normal)
 
-
-
-
-  // decode & (re‐)use the RV32I control for stall=NO_STALL by default
-  val control = Module(new ControlUnit)
-  control.io_reset    <> io_reset
-  control.io_ctrl.instr_type := instr_type
-  control.io_ctrl.data_gnt    := true.B
-  io.stall := control.io_ctrl.stall
-
-  // decoder to extract rs1,rs2,rd,imm
-  val dec = Module(new Decoder)
-  dec.io_reset         <> io_reset
-  dec.io_decoder.instr := io.instr
-
-  // submodules
-  val grev   = Module(genGeneralizedReverser())
-  val shfl   = Module(genShuffler())
-  val rot    = Module(genRotater())
-
-  // default: pacify unused
-  io_data <> DontCare
-  io_pc   <> DontCare
-  io_trap <> DontCare
-
-  grev.io    <> DontCare
-  shfl.io    <> DontCare
-  rot.io     <> DontCare
-
-  // PC always +4
-  io_pc.pc_wdata := io_pc.pc + 4.U
-  io_pc.pc_we    := control.io_ctrl.stall === STALL_REASON.NO_STALL
-
-  // register‐file address ports from decoder
-  io_reg.reg_rs1 := dec.io_decoder.rs1
-  io_reg.reg_rs2 := dec.io_decoder.rs2
-  io_reg.reg_rd  := dec.io_decoder.rd
-
-  // default writeback off & data = 0
-  io_reg.reg_write_en   := false.B
+  io.stall := STALL_REASON.NO_STALL
+  io_reg.reg_write_en := false.B
   io_reg.reg_write_data := 0.U
+  rotater.io.start := false.B
 
-  // extract operands & immediate/pattern
-  val a        = io_reg.reg_read_data1
-  val b        = io_reg.reg_read_data2
-  val imm5     = dec.io_decoder.instr(24,20)
-  val patt5    = b(4,0)       // dynamic pattern from rs2 low bits
-  val reverseA = Reverse(a)
+  io_reg.reg_rs1 := decoder.io_decoder.rs1
+  io_reg.reg_rs2 := decoder.io_decoder.rs2
+  io_reg.reg_rd  := decoder.io_decoder.rd
 
-  switch(instr_type) {
-    // ---- Combinational GREV ----
-    is(RISCV_TYPE.grev) {
-      grev.io.input   := a
-      grev.io.pattern := patt5
-      io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := grev.io.result
-    }
+  val rs1_val = io_reg.reg_read_data1
+  val rs2_val = io_reg.reg_read_data2
+  val imm_val = decoder.io_decoder.imm
 
-    // ---- Combinational SHFL / UNSHFL ----
-    is(RISCV_TYPE.shfl) {
-      shfl.io.input     := a
-      shfl.io.pattern   := patt5
-      shfl.io.unshuffle := 0.U
-      io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := shfl.io.result
-    }
-    is(RISCV_TYPE.unshfl) {
-      shfl.io.input     := a
-      shfl.io.pattern   := patt5
-      shfl.io.unshuffle := 1.U
-      io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := shfl.io.result
-    }
+  val imm_pattern = imm_val(4,0)
+  val rs2_pattern = rs2_val(4,0)
 
-    // ---- Immediate GREV I / SHFL I / UNSHFL I ----
-    is(RISCV_TYPE.grevi) {
-      grev.io.input   := a
-      grev.io.pattern := imm5
-      io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := grev.io.result
-    }
-    is(RISCV_TYPE.shfli) {
-      shfl.io.input     := a
-      shfl.io.pattern   := imm5
-      shfl.io.unshuffle := 0.U
-      io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := shfl.io.result
-    }
-    is(RISCV_TYPE.unshfli) {
-      shfl.io.input     := a
-      shfl.io.pattern   := imm5
-      shfl.io.unshuffle := 1.U
-      io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := shfl.io.result
-    }
+  generalizedReverser.io.input := rs1_val
+  generalizedReverser.io.pattern := rs2_pattern // default
 
-    // ---- Sequential ROTATES: ROL / ROR / RORI ----
-    is(RISCV_TYPE.rol) {
-      rot.io.input := a
-      rot.io.shamt := patt5
-      rot.io.start := true.B
-      io.stall     := STALL_REASON.EXECUTION_UNIT
+  shuffler.io.input := rs1_val
+  shuffler.io.pattern := rs2_pattern // default
+  shuffler.io.unshuffle := false.B // default
+
+  rotater.io.input := rs1_val
+  rotater.io.shamt := 0.U // default
+
+  switch(state) {
+    is(State.Normal) {
+      io.stall := STALL_REASON.NO_STALL
+
+      switch(instr_type) {
+        is(RISCV_TYPE.grev) {
+          generalizedReverser.io.pattern := rs2_pattern
+          io_reg.reg_write_data := generalizedReverser.io.result
+          io_reg.reg_write_en := true.B
+        }
+        is(RISCV_TYPE.grevi) {
+          generalizedReverser.io.pattern := imm_pattern
+          io_reg.reg_write_data := generalizedReverser.io.result
+          io_reg.reg_write_en := true.B
+        }
+        is(RISCV_TYPE.shfl) {
+          shuffler.io.pattern := rs2_pattern
+          shuffler.io.unshuffle := false.B
+          io_reg.reg_write_data := shuffler.io.result
+          io_reg.reg_write_en := true.B
+        }
+        is(RISCV_TYPE.shfli) {
+          shuffler.io.pattern := imm_pattern
+          shuffler.io.unshuffle := false.B
+          io_reg.reg_write_data := shuffler.io.result
+          io_reg.reg_write_en := true.B
+        }
+        is(RISCV_TYPE.unshfl) {
+          shuffler.io.pattern := rs2_pattern
+          shuffler.io.unshuffle := true.B
+          io_reg.reg_write_data := shuffler.io.result
+          io_reg.reg_write_en := true.B
+        }
+        is(RISCV_TYPE.unshfli) {
+          shuffler.io.pattern := imm_pattern
+          shuffler.io.unshuffle := true.B
+          io_reg.reg_write_data := shuffler.io.result
+          io_reg.reg_write_en := true.B
+        }
+        is(RISCV_TYPE.rol) {
+          rotater.io.start := true.B
+          rotater.io.shamt := rs2_pattern
+          rotater.io.input := Reverse(rs1_val)
+          io.stall := STALL_REASON.EXECUTION_UNIT
+          state := State.Rotating
+          io_reg.reg_write_en := false.B
+        }
+        is(RISCV_TYPE.ror) {
+          rotater.io.start := true.B
+          rotater.io.shamt := rs2_pattern
+          io.stall := STALL_REASON.EXECUTION_UNIT
+          state := State.Rotating
+          io_reg.reg_write_en := false.B
+        }
+        is(RISCV_TYPE.rori) {
+          rotater.io.start := true.B
+          rotater.io.shamt := imm_pattern
+          io.stall := STALL_REASON.EXECUTION_UNIT
+          state := State.Rotating
+          io_reg.reg_write_en := false.B
+        }
+      }
     }
-    is(RISCV_TYPE.ror) {
-      rot.io.input := a
-      rot.io.shamt := patt5
-      rot.io.start := true.B
-      io.stall     := STALL_REASON.EXECUTION_UNIT
-    }
-    is(RISCV_TYPE.rori) {
-      rot.io.input := a
-      rot.io.shamt := imm5
-      rot.io.start := true.B
-      io.stall     := STALL_REASON.EXECUTION_UNIT
+    is(State.Rotating) {
+      io.stall := STALL_REASON.EXECUTION_UNIT
+      rotater.io.start := false.B
+
+      when(rotater.io.done) {
+        io_reg.reg_write_en := true.B
+
+        when (instr_type === RISCV_TYPE.rol) {
+          io_reg.reg_write_data := Reverse(rotater.io.result)
+        } .otherwise {
+          io_reg.reg_write_data := rotater.io.result
+        }
+
+        io.stall := STALL_REASON.NO_STALL
+        state := State.Normal
+      }
     }
   }
 
-  // feed sequential rotater and write back when done
-  // these two lines apply regardless of which rotate variant
-  when(instr_type.isOneOf(RISCV_TYPE.rol, RISCV_TYPE.ror, RISCV_TYPE.rori)) {
-    // keep driving inputs
-    // rot.io.input and shamt already set above
-    rot.io.start := false.B     // only true in the cycle we matched above
-    io.stall     := Mux(rot.io.done, STALL_REASON.NO_STALL, STALL_REASON.EXECUTION_UNIT)
-    when(rot.io.done) {
-      io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := rot.io.result
-    }
-  }
+  io_data.data_req := false.B
+  io_data.data_addr := 0.U
+  io_data.data_be := 0.U
+  io_data.data_we := false.B
+  io_data.data_wdata := 0.U
 
+  io_pc.pc_wdata := io_pc.pc + 4.U
+  io_pc.pc_we := io.stall === STALL_REASON.NO_STALL
+
+  io_trap.trap_valid := false.B
+  io_trap.trap_reason := TRAP_REASON.NONE
 }

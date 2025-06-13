@@ -49,7 +49,7 @@ class RV32I(
       io_pc.pc_wdata := io_pc.pc + decoder.io_decoder.imm
     }
     is (NEXT_PC_SELECT.ALU_OUT_ALIGNED) {
-      io_pc.pc_wdata := (alu.io_alu.result & ~1.U)
+      io_pc.pc_wdata := (alu.io_alu.result & (~1.U))
     }
   }
   io_pc.pc_we := control_unit.io_ctrl.stall === STALL_REASON.NO_STALL
