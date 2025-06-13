@@ -26,5 +26,14 @@ object PermBuilder {
 
     ??? // TODO: implement Task 2.6 here
 
+    // one correct implementation:
+    //    have this function: List<string> Cycle(int rd, int rs1, List<int> indices); which gives you back the instructions to move every bit in the cycle
+    //    for example if the permutation is 0 -> 3, 3 -> 5, 5 -> 0. [0, 3, 5] is the cycle. then the output should move them one further in the cycle
+    //    the "indices" parameter should be a closed cycle.
+    //    if i do this for every cycle in the permutation then i am done
+    //    the thing is how can i implement this Cycle function
+    //    assume that i have a swap function can cycle be implemented as a sequence of swaps?
+    //    how to implement swap function? thats also hard to do
+
   }
 }
