@@ -20,4 +20,16 @@ class LeadingZerosCounterTest
     }
   }
 
+  "LeadingZerosCounter" should "count leading zeros" in {
+    test(new LeadingZerosCounter(8)) { c =>
+      c.io.input.poke("b00000000".U)
+      c.io.result.expect(8.U)
+      c.io.input.poke("b00000001".U)
+      c.io.result.expect(7.U)
+      c.io.input.poke("b10000000".U)
+      c.io.result.expect(0.U)
+      c.io.input.poke("b00100000".U)
+      c.io.result.expect(2.U)
+    }
+  }
 }

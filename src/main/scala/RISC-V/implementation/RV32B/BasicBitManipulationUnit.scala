@@ -69,28 +69,24 @@ class BasicBitManipulationUnit(
 
   leadingZerosCounter.io.input := 0.U
 
-  val a  = io_reg.reg_read_data1
-  val b  = io_reg.reg_read_data2
-
-  val revA = Reverse(a)
-  val popA = PopCount(a)
-  val lz   = leadingZerosCounter.io.result
+  val a = io_reg.reg_read_data1
+  val b = io_reg.reg_read_data2
 
   // this is like alu. idk
   switch(io.instr_type) {
     is(RISCV_TYPE.clz) {
       leadingZerosCounter.io.input := a
       // io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := lz
+      io_reg.reg_write_data := leadingZerosCounter.io.result
     }
     is(RISCV_TYPE.ctz) {
-      leadingZerosCounter.io.input := revA
+      leadingZerosCounter.io.input := Reverse(a)
       // io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := lz
+      io_reg.reg_write_data := leadingZerosCounter.io.result
     }
     is(RISCV_TYPE.cpop) {
       // io_reg.reg_write_en   := true.B
-      io_reg.reg_write_data := popA
+      io_reg.reg_write_data := PopCount(a)
     }
     is(RISCV_TYPE.min) {
       // io_reg.reg_write_en   := true.B
