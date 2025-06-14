@@ -24,7 +24,7 @@ object PermBuilder {
     */
   def buildPermutation(rd: Int, rs1: Int, perm: Map[Int, Int]): List[String] = {
 
-    ??? // TODO: implement Task 2.6 here
+    // ??? // TODO: implement Task 2.6 here
 
     // one correct implementation:
     //    have this function: List<string> Cycle(int rd, int rs1, List<int> indices); which gives you back the instructions to move every bit in the cycle
@@ -35,5 +35,6 @@ object PermBuilder {
     //    assume that i have a swap function can cycle be implemented as a sequence of swaps?
     //    how to implement swap function? thats also hard to do
 
+    return List.empty[String]
   }
 }
