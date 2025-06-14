@@ -3,6 +3,19 @@ package RISCV.utils
 
 object PermBuilder {
 
+  // returns the rottaion amount. always positive and to the left
+  def IsOnlyRotation(permutation: Map[Int, Int]): (Boolean, Int) = {
+    val rotationAmount = permutation(0)
+
+    for (i <- 0 until permutation.size) {
+      if (((((permutation(i) - i) % permutation.size) + permutation.size) % permutation.size) != rotationAmount) {
+        return (false, 0)
+      }
+    }
+
+    return (true, rotationAmount)
+  }
+
   /** This function takes a mapping for the permutation and returns the list of
     * necessary instructions to implement the permutation.
     *
@@ -34,6 +47,17 @@ object PermBuilder {
     //    the thing is how can i implement this Cycle function
     //    assume that i have a swap function can cycle be implemented as a sequence of swaps?
     //    how to implement swap function? thats also hard to do
+
+    val (isRotation, rotationAmount) = IsOnlyRotation(perm)
+    if (isRotation) {
+      if (rotationAmount == 0) {
+        return List.empty[String]
+      } else {
+        val rightRotation = 32 - rotationAmount
+        val instruction = s"rori x$rd, x$rs1, x$rightRotation"
+        return List(instruction)
+      }
+    }
 
     return List.empty[String]
   }
